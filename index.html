@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pokedex — Unique Layout Edition</title>
+  <meta name="description" content="A uniquely styled Pokédex using PokeAPI with a three‑pane layout: type rail, results grid, slide‑in details. No server required." />
+  <!--
+  README (≤1 page)
+  =================
+  App: Pokédex — Unique Layout Edition
+  API: PokeAPI (GET only, no key): https://pokeapi.co/
+  What makes it unique:
+    • Three‑pane layout (left type rail, center results grid, right slide‑in inspector).
+    • Theme is algorithmically generated from USER_SIGNATURE so your colors/background are unique.
+    • Cards with large translucent ID watermark and animated artwork hover.
+  Features (meets assignment):
+    • Fetch types, lists, and Pokémon details with fetch() (GET).
+    • Interactive controls: search (name), filter (type via rail), sort (ID/Name), pagination.
+    • Dynamic rendering + loading/error states; persists last query/type/sort in localStorage.
+  How to split into three files:
+    1) Create index.html and paste only the HTML structure below (no <style> or <script> tags with code).
+    2) Create style.css and paste the CSS section below.
+    3) Create app.js and paste the JS section below.
+  -->
+
+  <link rel="stylesheet" href="style.css" />
+  <script defer src="app.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm0 3a7 7 0 0 1 6.708 5H14.5a2.5 2.5 0 0 0-5 0H5.292A7 7 0 0 1 12 5Zm0 14a7 7 0 0 1-6.708-5H9.5a2.5 2.5 0 0 0 5 0h4.208A7 7 0 0 1 12 19Z"/></svg>
+      <div>
+        <h1>Pokedex</h1>
+        <small>Unique Layout Edition</small>
+      </div>
+    </div>
+    <form id="controls" class="controls" autocomplete="off">
+      <label class="visually-hidden" for="q">Search by name</label>
+      <input id="q" name="q" type="search" placeholder="Search by name…" />
+      <select id="sort" name="sort" title="Sort">
+        <option value="id-asc"># ID (asc)</option>
+        <option value="name-asc">Name (A→Z)</option>
+      </select>
+      <button class="btn" id="apply" type="submit">Search</button>
+      <button class="btn ghost" id="clear" type="button">Clear</button>
+    </form>
+  </div>
+</header>
+
+<div class="layout wrap">
+  <aside class="type-rail" aria-label="Filter by type">
+    <div class="rail-head">
+      <h2>Types</h2>
+      <button class="pill active" data-type="">All</button>
+    </div>
+    <nav id="typeList" class="rail-list" role="list"></nav>
+  </aside>
+
+  <main class="content" id="content">
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <section aria-label="Results">
+      <div id="results" class="grid" role="list"></div>
+      <div class="pagination" id="pager">
+        <button class="btn" id="prev">⟨ Prev</button>
+        <span class="page-info" id="pageInfo">Page 1</span>
+        <button class="btn" id="next">Next ⟩</button>
+      </div>
+    </section>
+  </main>
+
+  <aside id="drawer" class="drawer" aria-label="Details" aria-hidden="true">
+    <button class="drawer-close" aria-label="Close">×</button>
+    <div class="drawer-body">
+      <div class="hero">
+        <img id="dImg" alt="" />
+        <div class="id-water" id="dId">#000</div>
+      </div>
+      <h2 id="dName"></h2>
+      <div class="badges" id="dTypes"></div>
+      <div class="kv" id="dKv"></div>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-footer wrap">
+  <span>Data: <a href="https://pokeapi.co/" target="_blank" rel="noopener">PokeAPI</a></span>
+  <span class="sig">Theme signature: <code id="sig"></code></span>
+</footer>
+
+<!-- ===== style.css ===== -->
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151c;
+    --card: #161a22;
+    --text: #e9e9ee;
+    --muted: #a7a9b3;
+    --accent: 270 90% 60%; /* h s l */
+    --accent-2: 200 90% 54%;
+    --radius: 16px;
+    --ring: 0 0% 100% / .08;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, hsl(var(--accent) / .20), transparent),
+      radial-gradient(1000px 500px at 115% 10%, hsl(var(--accent-2) / .18), transparent),
+      var(--bg);
+    color: var(--text);
+    font: 15px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+
+  /* Header */
+  .site-header { position: sticky; top: 0; z-index: 10; background: color-mix(in oklab, var(--bg) 80%, black 20%); border-bottom: 1px solid #20242e; backdrop-filter: blur(8px); }
+  .header-inner { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: center; }
+  .brand { display: flex; align-items: center; gap: .75rem; }
+  .brand h1 { margin: 0; font-size: 1.35rem; }
+  .brand small { color: var(--muted); }
+
+  .controls { display: grid; grid-template-columns: 1fr auto auto auto; gap: .5rem; }
+  .controls input[type="search"], .controls select { padding: .65rem .8rem; border-radius: 12px; border: 1px solid #282c38; background: #141821; color: var(--text); }
+  .btn { padding: .65rem .9rem; border-radius: 12px; border: 1px solid #2a2f3a; background: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-2))); color: white; cursor: pointer; }
+  .btn.ghost { background: transparent; border: 1px solid #2a2f3a; color: var(--text); }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 220px 1fr; gap: 1rem; }
+  @media (min-width: 980px) { .layout { grid-template-columns: 220px 1fr 380px; } }
+
+  /* Type rail */
+  .type-rail { background: var(--panel); border: 1px solid #202634; border-radius: var(--radius); padding: .75rem; position: sticky; top: 78px; height: calc(100dvh - 100px); overflow: auto; }
+  .rail-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+  .rail-head h2 { margin: 0; font-size: 1rem; color: var(--muted); }
+  .pill { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .6rem; border-radius: 999px; border: 1px solid #2a3040; background: #121722; color: var(--text); cursor: pointer; }
+  .pill.active { outline: 2px solid color-mix(in oklab, hsl(var(--accent)) 60%, white 0%); background: color-mix(in oklab, hsl(var(--accent)) 25%, #121722 75%); }
+  .rail-list { display: grid; gap: .4rem; }
+
+  /* Content */
+  .status { margin: .5rem 0 1rem; display: none; padding: .75rem .9rem; border-radius: 12px; background: #141821; color: var(--muted); border: 1px solid #23293a; }
+  .status.show { display: block; }
+  .status.err { color: #ffd7d7; background: #2a1518; border-color: #4b1a1f; }
+
+  .grid { display: grid; gap: .9rem; grid-template-columns: repeat(1, minmax(0,1fr)); }
+  @media (min-width: 680px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  @media (min-width: 1024px) { .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+
+  .card { position: relative; background: var(--card); border: 1px solid #242a38; border-radius: 18px; overflow: hidden; cursor: pointer; }
+  .card .inner { display: grid; grid-template-columns: 120px 1fr; gap: .75rem; padding: .9rem; align-items: center; }
+  .thumb { width: 120px; height: 120px; display: grid; place-items: center; background: #0f131b; border-radius: 14px; }
+  .thumb img { width: 96px; height: 96px; image-rendering: pixelated; filter: drop-shadow(0 8px 16px rgba(0,0,0,.35)); transition: transform .25s ease; }
+  .card:hover .thumb img { transform: translateY(-2px) scale(1.03); }
+
+  .meta h3 { margin: 0 0 .25rem; font-size: 1.05rem; }
+  .meta .id { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .badges { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .badge { font-size: .75rem; padding: .18rem .5rem; border-radius: 999px; background: #222836; color: #dde3f0; border: 1px solid #2d3546; }
+
+  .watermark { position: absolute; right: .5rem; bottom: .3rem; font-weight: 700; font-size: 3rem; line-height: 1; color: #ffffff10; pointer-events: none; }
+
+  .pagination { margin: 1rem 0 2rem; display: flex; gap: .5rem; align-items: center; justify-content: center; }
+  .page-info { color: var(--muted); font-size: .9rem; }
+
+  /* Drawer */
+  .drawer { position: sticky; top: 78px; height: calc(100dvh - 100px); background: var(--panel); border: 1px solid #202634; border-radius: var(--radius); overflow: hidden; display: none; }
+  @media (min-width: 980px) { .drawer { display: block; transform: translateX(0); }
+  }
+  .drawer[aria-hidden="true"] .drawer-body { opacity: .5; filter: grayscale(.3); }
+  .drawer-close { position: absolute; top: .5rem; right: .5rem; background: transparent; border: 1px solid #2a3040; color: #9aa0aa; border-radius: 10px; padding: .2rem .45rem; cursor: pointer; }
+  .drawer-body { padding: 1rem; }
+  .hero { position: relative; background: #0f131b; border: 1px solid #1f2532; border-radius: 14px; display: grid; place-items: center; height: 220px; margin-bottom: .75rem; }
+  .hero img { width: 160px; height: 160px; image-rendering: pixelated; filter: drop-shadow(0 12px 20px rgba(0,0,0,.35)); }
+  .id-water { position: absolute; right: .6rem; bottom: .3rem; font-weight: 800; font-size: 3.5rem; line-height: 1; color: #ffffff12; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: .25rem .75rem; margin-top: .75rem; }
+
+  /* Footer */
+  .site-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; color: var(--muted); border-top: 1px solid #20242e; padding: 1rem; font-size: .9rem; }
+
+  /* A11y helpers */
+  .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+</style>
+
+<!-- ===== app.js ===== -->
+<script>
+  const API = 'https://pokeapi.co/api/v2';
+
+  // Change this to your name/initials for a unique theme
+  const USER_SIGNATURE = 'YourNameHere';
+
+  // App state
+  const state = {
+    mode: 'all', // 'all' | 'type' | 'search'
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    type: '',
+    query: '',
+    listCache: [],
+  };
+
+  // Elements
+  const el = {
+    q: document.querySelector('#q'),
+    sort: document.querySelector('#sort'),
+    form: document.querySelector('#controls'),
+    results: document.querySelector('#results'),
+    status: document.querySelector('#status'),
+    pager: document.querySelector('#pager'),
+    prev: document.querySelector('#prev'),
+    next: document.querySelector('#next'),
+    pageInfo: document.querySelector('#pageInfo'),
+    typeList: document.querySelector('#typeList'),
+    drawer: document.querySelector('#drawer'),
+    dImg: document.querySelector('#dImg'),
+    dId: document.querySelector('#dId'),
+    dName: document.querySelector('#dName'),
+    dTypes: document.querySelector('#dTypes'),
+    dKv: document.querySelector('#dKv'),
+    clear: document.querySelector('#clear'),
+    sig: document.querySelector('#sig'),
+  };
+
+  // ===== Theme (unique per student) =====
+  function hashString(str) { let h=0; for (let i=0;i<str.length;i++) { h=(h<<5)-h+str.charCodeAt(i); h|=0; } return Math.abs(h); }
+  function applyTheme(seed) {
+    const h1 = hashString(seed) % 360;
+    const h2 = (h1 + 40 + (hashString(seed+'x')%80)) % 360;
+    document.documentElement.style.setProperty('--accent', `${h1} 85% 58%`);
+    document.documentElement.style.setProperty('--accent-2', `${h2} 85% 58%`);
+    el.sig.textContent = seed;
+  }
+
+  // ===== Init =====
+  document.addEventListener('DOMContentLoaded', async () => {
+    applyTheme((localStorage.getItem('pokedex-signature')) || USER_SIGNATURE);
+    await populateTypes();
+    loadPrefs();
+    applyFromControls();
+    bindEvents();
+  });
+
+  function bindEvents() {
+    el.form.addEventListener('submit', (e) => { e.preventDefault(); applyFromControls(); });
+    el.prev.addEventListener('click', () => { if (state.page > 1) { state.page--; render(); } });
+    el.next.addEventListener('click', () => { const maxPage = Math.max(1, Math.ceil(state.total / state.pageSize)); if (state.page < maxPage) { state.page++; render(); } });
+    el.clear.addEventListener('click', () => { el.q.value = ''; state.type=''; state.mode='all'; state.page=1; document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active')); document.querySelector('.pill[data-type=""]').classList.add('active'); savePrefs(); render(); });
+    el.drawer.querySelector('.drawer-close').addEventListener('click', () => { el.drawer.setAttribute('aria-hidden','true'); });
+  }
+
+  // ===== Persistence =====
+  const savePrefs = () => localStorage.setItem('pokedex-prefs', JSON.stringify({ q: el.q.value.trim(), type: state.type, sort: el.sort.value }));
+  function loadPrefs() {
+    try { const p = JSON.parse(localStorage.getItem('pokedex-prefs')); if (p) { el.q.value = p.q || ''; state.type = p.type || ''; el.sort.value = p.sort || 'id-asc'; if(state.type){ document.querySelector('.pill[data-type=""]').classList.remove('active'); } } } catch {}
+  }
+
+  // ===== Types rail =====
+  async function populateTypes() {
+    try {
+      const res = await fetch(`${API}/type`);
+      if (!res.ok) throw new Error('Failed to load types');
+      const data = await res.json();
+      el.typeList.innerHTML = '';
+      data.results.forEach(t => {
+        const b = document.createElement('button');
+        b.className = 'pill'; b.dataset.type = t.name; b.textContent = cap(t.name);
+        b.addEventListener('click', () => {
+          document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+          b.classList.add('active');
+          state.type = t.name; state.mode = 'type'; state.page = 1; savePrefs(); render();
+        });
+        el.typeList.appendChild(b);
+      });
+    } catch (err) {
+      console.error(err);
+      setStatus('Could not load types. You can still search by name.', 'err');
+    }
+  }
+
+  // ===== Controls → state =====
+  function applyFromControls() {
+    state.query = el.q.value.trim().toLowerCase();
+    state.page = 1; savePrefs();
+    if (state.query) { state.mode = 'search'; state.type=''; render(); }
+    else if (state.type) { state.mode = 'type'; render(); }
+    else { state.mode = 'all'; render(); }
+  }
+
+  // ===== Rendering =====
+  async function render() {
+    setStatus('Loading…');
+    el.results.innerHTML = '';
+    el.pager.style.display = 'flex';
+
+    try {
+      if (state.mode === 'search') {
+        const poke = await fetchPokemon(state.query);
+        state.total = poke ? 1 : 0;
+        el.pager.style.display = 'none';
+        if (!poke) { setStatus('No Pokémon found with that name.', 'err'); return; }
+        el.results.append(card(poke));
+        setStatus(''); return;
+      }
+
+      if (state.mode === 'type') {
+        if (!state.listCache.length || state.listCacheType !== state.type) {
+          const t = await fetchJson(`${API}/type/${state.type}`);
+          state.listCache = t.pokemon.map(p => p.pokemon.name);
+          state.listCacheType = state.type;
+        }
+        state.total = state.listCache.length;
+        const pageNames = paginateNames(state.listCache, state.page, state.pageSize);
+        const pokes = await Promise.all(pageNames.map(n => fetchPokemon(n)));
+        const sorted = sortPokes(pokes.filter(Boolean), el.sort.value);
+        mountCards(sorted);
+        setStatus('');
+      } else {
+        const offset = (state.page - 1) * state.pageSize;
+        const list = await fetchJson(`${API}/pokemon?limit=${state.pageSize}&offset=${offset}`);
+        state.total = list.count;
+        const pokes = await Promise.all(list.results.map(r => fetchPokemon(r.name)));
+        const sorted = sortPokes(pokes.filter(Boolean), el.sort.value);
+        mountCards(sorted);
+        setStatus('');
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus('Something went wrong. Please try again.', 'err');
+    }
+
+    const maxPage = Math.max(1, Math.ceil(state.total / state.pageSize));
+    el.pageInfo.textContent = `Page ${state.page} / ${maxPage}`;
+    el.prev.disabled = state.page <= 1;
+    el.next.disabled = state.page >= maxPage;
+  }
+
+  function sortPokes(arr, how) { const copy=[...arr]; if (how==='name-asc') copy.sort((a,b)=>a.name.localeCompare(b.name)); else copy.sort((a,b)=>a.id-b.id); return copy; }
+  function paginateNames(all, page, pageSize) { const start=(page-1)*pageSize; return all.slice(start, start+pageSize); }
+
+  async function fetchJson(url) { const res=await fetch(url); if(!res.ok) throw new Error(`HTTP ${res.status} for ${url}`); return res.json(); }
+  async function fetchPokemon(name) { try { return await fetchJson(`${API}/pokemon/${encodeURIComponent(name.toLowerCase())}`); } catch { return null; } }
+
+  function mountCards(list) { el.results.innerHTML=''; list.forEach(p=> el.results.append(card(p))); }
+
+  function card(p) {
+    const c = document.createElement('article');
+    c.className = 'card'; c.setAttribute('role','listitem');
+    c.innerHTML = `
+        <div class="inner">
+          <div class="thumb">${imageTag(p)}</div>
+          <div class="meta">
+            <h3>${cap(p.name)} <span class="id">#${String(p.id).padStart(3,'0')}</span></h3>
+            <div class="badges">${p.types.map(t => `<span class="badge" style="${typeStyle(t.type.name)}">${cap(t.type.name)}</span>`).join('')}</div>
+          </div>
+        </div>
+        <div class="watermark">${String(p.id).padStart(3,'0')}</div>`;
+    c.addEventListener('click', () => openDrawer(p));
+    return c;
+  }
+
+  function imageTag(p) {
+    const src = p.sprites.other?.['official-artwork']?.front_default || p.sprites.front_default;
+    const alt = `${cap(p.name)} official artwork`;
+    return src ? `<img loading="lazy" src="${src}" alt="${alt}"/>` : `<div style="width:96px;height:96px;border-radius:10px;background:#222"></div>`;
+  }
+
+  function openDrawer(p) {
+    el.dImg.src = p.sprites.other?.['official-artwork']?.front_default || p.sprites.front_default || '';
+    el.dImg.alt = `${cap(p.name)} image`;
+    el.dId.textContent = `#${String(p.id).padStart(3,'0')}`;
+    el.dName.textContent = cap(p.name);
+    el.dTypes.innerHTML = p.types.map(t => `<span class="badge" style="${typeStyle(t.type.name)}">${cap(t.type.name)}</span>`).join('');
+    el.dKv.innerHTML = '';
+    const rows = [
+      ['Height', (p.height/10).toFixed(1) + ' m'],
+      ['Weight', (p.weight/10).toFixed(1) + ' kg'],
+      ['Abilities', p.abilities.map(a => cap(a.ability.name)).join(', ')],
+      ['Base stats', p.stats.map(s => `${cap(s.stat.name)}: ${s.base_stat}`).join(' | ')],
+    ];
+    rows.forEach(([k,v]) => { const kEl=document.createElement('div'); kEl.textContent=k; kEl.style.color='var(--muted)'; const vEl=document.createElement('div'); vEl.textContent=v; el.dKv.append(kEl,vEl); });
+    el.drawer.setAttribute('aria-hidden','false');
+  }
+
+  // ===== Helpers =====
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const setStatus = (msg='', type='info') => { if(!msg){ el.status.className='status'; el.status.textContent=''; return; } el.status.textContent=msg; el.status.className='status show' + (type==='err' ? ' err' : ''); };
+
+  function typeStyle(name){
+    // Stable color per type name
+    const h = (hashString(name) % 360);
+    return `background: hsl(${h} 60% 20%); border-color: hsl(${h} 55% 28%); color: white;`;
+  }
+</script>
+</body>
+</html>

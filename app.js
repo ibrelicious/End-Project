@@ -1,21 +1,24 @@
+// Bas-URL till PokeAPI
 const API = 'https://pokeapi.co/api/v2';
 
-// Ändra till ditt namn/initialer för unikt tema
+// Ändra till ditt namn/initialer för unikt färgtema (sparas i localStorage)
 const USER_SIGNATURE = 'YourNameHere';
 
 // ===== App state =====
+// Central "single source of truth" för vylogik och filter.
 const state = {
-  mode: 'all',     // 'all' | 'type' | 'search'
-  page: 1,
-  pageSize: 20,
-  total: 0,
-  type: '',
-  query: '',
-  listCache: [],   // används för typ-filter (lista av namn)
-  listCacheType: ''
+  mode: 'all',     // 'all' = bläddra, 'type' = filtrerat på typ, 'search' = exakt namn/id
+  page: 1,         // aktuell sida i paginering
+  pageSize: 20,    // antal kort per sida
+  total: 0,        // total träffmängd för aktuell vy
+  type: '',        // vald typ (tom = alla)
+  query: '',       // söksträng (namn/id)
+  listCache: [],   // cache för namnen när man filtrerar per typ (API för typ ger enbart namnlistor)
+  listCacheType: ''// vilken typ cachen hör till (så vi vet när den är stale)
 };
 
 // ===== Elements =====
+// Bekväma referenser till DOM-element vi interagerar med ofta.
 const el = {
   q: document.querySelector('#q'),
   sort: document.querySelector('#sort'),
@@ -38,7 +41,10 @@ const el = {
 };
 
 // ===== Theme (unik per student) =====
+// Enkel deterministic hash av en sträng → heltal
 function hashString(str) { let h=0; for (let i=0;i<str.length;i++) { h=(h<<5)-h+str.charCodeAt(i); h|=0; } return Math.abs(h); }
+// Härled två HSL-nyanser från "seed" och applicera som CSS-variabler.
+// Signaturen visas även i sidfoten så man ser vilket tema som är valt.
 function applyTheme(seed) {
   const h1 = hashString(seed) % 360;
   const h2 = (h1 + 40 + (hashString(seed+'x')%80)) % 360;
@@ -48,23 +54,30 @@ function applyTheme(seed) {
 }
 
 // ===== Init =====
+// Startpunkt: applicera tema, ladda typknappar, läs preferenser och bind events.
 document.addEventListener('DOMContentLoaded', async () => {
   applyTheme((localStorage.getItem('pokedex-signature')) || USER_SIGNATURE);
-  await populateTypes();
-  loadPrefs();
+  await populateTypes(); // fyller type-rail från API
+  loadPrefs();           // läser sparad sök/typ/sort
   // markera sparad typ-pill om någon fanns
   setActiveTypePill(state.type);
-  applyFromControls();
-  bindEvents();
+  applyFromControls();   // etablerar korrekt 'mode' och render
+  bindEvents();          // klick/submit/ESC osv.
 });
 
+// Registrera alla händelser som styr appens beteende.
 function bindEvents() {
+  // Sök / Sortera (submit på formuläret)
   el.form.addEventListener('submit', (e) => { e.preventDefault(); applyFromControls(); });
+
+  // Paginering bakåt/framåt
   el.prev.addEventListener('click', () => { if (state.page > 1) { state.page--; render(); } });
   el.next.addEventListener('click', () => {
     const maxPage = Math.max(1, Math.ceil(state.total / state.pageSize));
     if (state.page < maxPage) { state.page++; render(); }
   });
+
+  // Rensa: töm sökfält, nollställ typ och gå till "all"
   el.clear.addEventListener('click', () => {
     el.q.value = '';
     state.type = '';
@@ -74,7 +87,8 @@ function bindEvents() {
     savePrefs();
     render();
   });
-  // "Alla"-pill
+
+  // "Alla"-pill (knappen högst upp i type-rail)
   document.querySelector('.pill[data-type=""]').addEventListener('click', () => {
     state.type = '';
     state.mode = 'all';
@@ -83,13 +97,16 @@ function bindEvents() {
     savePrefs();
     render();
   });
-  // Drawer close + ESC
+
+  // Stäng detaljpanelen och stöd för ESC
   el.drawer.querySelector('.drawer-close').addEventListener('click', closeDrawer);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 }
 
 // ===== Persistence =====
+// Spara senaste sökning/typ/sort i localStorage
 const savePrefs = () => localStorage.setItem('pokedex-prefs', JSON.stringify({ q: el.q.value.trim(), type: state.type, sort: el.sort.value }));
+// Läs preferenser vid start (tyst felhantering ifall JSON saknas/trasig)
 function loadPrefs() {
   try {
     const p = JSON.parse(localStorage.getItem('pokedex-prefs'));
@@ -102,6 +119,7 @@ function loadPrefs() {
 }
 
 // ===== Types rail =====
+// Hämtar alla typer (bug, fire, water...) och skapar en knapp per typ.
 async function populateTypes() {
   try {
     const res = await fetch(`${API}/type`, { mode: 'cors' });
@@ -129,6 +147,7 @@ async function populateTypes() {
   }
 }
 
+// Visuell/haptisk markering av vilken typ-pill som är aktiv.
 function setActiveTypePill(typeName) {
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
   const btn = document.querySelector(`.pill[data-type="${CSS.escape(typeName)}"]`) || document.querySelector('.pill[data-type=""]');
@@ -136,6 +155,7 @@ function setActiveTypePill(typeName) {
 }
 
 // ===== Controls → state =====
+// Läser av formuläret och ställer in "mode": search/type/all, samt resetar sidan.
 function applyFromControls() {
   state.query = el.q.value.trim().toLowerCase();
   state.page = 1;
@@ -146,12 +166,14 @@ function applyFromControls() {
 }
 
 // ===== Rendering =====
+// Huvudfunktionen som hämtar data enligt state och målar korten + paginering.
 async function render() {
   setStatus('Laddar…');
   el.results.innerHTML = '';
   el.pager.style.display = 'flex';
 
   try {
+    // 1) Exakt sökning på namn/id → visar en enda träff, ingen paginering.
     if (state.mode === 'search') {
       const poke = await fetchPokemon(state.query);
       state.total = poke ? 1 : 0;
@@ -162,6 +184,7 @@ async function render() {
       return;
     }
 
+    // 2) Filtrerat på typ → API ger en stor lista med namn; vi cachar den och paginerar lokalt.
     if (state.mode === 'type') {
       // Hämta listan (namn) för vald typ, cachea
       if (!state.listCache.length || state.listCacheType !== state.type) {
@@ -176,7 +199,7 @@ async function render() {
       mountCards(sorted);
       setStatus('');
     } else {
-      // mode === 'all'
+      // 3) "All" → använd PokeAPIs list-endpoint som redan är paginerad (limit/offset)
       const offset = (state.page - 1) * state.pageSize;
       const list = await fetchJson(`${API}/pokemon?limit=${state.pageSize}&offset=${offset}`);
       state.total = list.count;
@@ -190,28 +213,35 @@ async function render() {
     setStatus('Något gick fel. Försök igen.', 'err');
   }
 
+  // Uppdatera paginerings-UI (aktuell sida / maxsida + disable knappar vid kant)
   const maxPage = Math.max(1, Math.ceil(state.total / state.pageSize));
   el.pageInfo.textContent = `Sida ${state.page} / ${maxPage}`;
   el.prev.disabled = state.page <= 1;
   el.next.disabled = state.page >= maxPage;
 }
 
+// Sortering enligt användarens val (namn A→Ö eller id stigande)
 function sortPokes(arr, how) {
   const copy = [...arr];
   if (how === 'name-asc') copy.sort((a,b) => a.name.localeCompare(b.name));
   else copy.sort((a,b) => a.id - b.id);
   return copy;
 }
+
+// Skär ut en sida ur en namnlista (för typ-filtret)
 function paginateNames(all, page, pageSize) {
   const start = (page - 1) * pageSize;
   return all.slice(start, start + pageSize);
 }
 
+// Liten fetch-hjälpare som kastar vid HTTP-fel
 async function fetchJson(url) {
   const res = await fetch(url, { mode: 'cors' });
   if (!res.ok) throw new Error(`HTTP ${res.status} för ${url}`);
   return res.json();
 }
+
+// Hämtar full Pokémon-detalj (sprites, stats, typer) via namn/id. Returnerar null om ej hittad.
 async function fetchPokemon(nameOrId) {
   try {
     return await fetchJson(`${API}/pokemon/${encodeURIComponent(String(nameOrId).toLowerCase())}`);
@@ -220,11 +250,13 @@ async function fetchPokemon(nameOrId) {
   }
 }
 
+// Renderhjälpare: töm grid och lägg in ett card per Pokémon
 function mountCards(list) {
   el.results.innerHTML = '';
   list.forEach(p => el.results.append(card(p)));
 }
 
+// Skapar ett "card" (article) med bild, namn, id och typ-badges. Klick öppnar detaljpanel.
 function card(p) {
   const c = document.createElement('article');
   c.className = 'card';
@@ -242,12 +274,14 @@ function card(p) {
   return c;
 }
 
+// Väljer bästa tillgängliga sprite och genererar img-tag eller en placeholder
 function imageTag(p) {
   const src = p.sprites?.other?.['official-artwork']?.front_default || p.sprites?.front_default;
   const alt = `${cap(p.name)} officiell artwork`;
   return src ? `<img loading="lazy" src="${src}" alt="${alt}"/>` : `<div style="width:96px;height:96px;border-radius:10px;background:#222"></div>`;
 }
 
+// Öppnar detaljpanel och fyller den med bild, id, namn, typer och kv-info (höjd/vikt/förmågor/stats)
 function openDrawer(p) {
   el.dImg.src = p.sprites?.other?.['official-artwork']?.front_default || p.sprites?.front_default || '';
   el.dImg.alt = `${cap(p.name)} bild`;
@@ -270,17 +304,21 @@ function openDrawer(p) {
   // sätt fokus till stäng-knappen för a11y
   queueMicrotask(() => el.drawer.querySelector('.drawer-close').focus());
 }
+// Stänger panelen
 function closeDrawer() { el.drawer.setAttribute('aria-hidden','true'); }
 
 // ===== Helpers =====
+// Versaliserar första bokstaven
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Statusrad (visar/byter klass för info/fel)
 const setStatus = (msg = '', type = 'info') => {
   if (!msg) { el.status.className = 'status'; el.status.textContent = ''; return; }
   el.status.textContent = msg;
   el.status.className = 'status show' + (type === 'err' ? ' err' : '');
 };
 
-// Stabil färg per typ (hash → HSL)
+// Stabil färg per typ: hash → HSL, används inline på badges för konsek vent tema
 function typeStyle(name) {
   const h = (hashString(name) % 360);
   return `background: hsl(${h} 60% 20%); border-color: hsl(${h} 55% 28%); color: white;`;

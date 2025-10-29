@@ -1,17 +1,25 @@
 <!doctype html>
 <html lang="sv">
 <head>
+  <!-- Grundläggande metadata och responsiv viewport -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Titel och beskrivning för SEO/delning -->
   <title>Pokedex — Unique Layout Edition</title>
   <meta name="description" content="En Pokédex med trepanig layout (typ-rail, resultatgrid, detaljpanel) byggd med PokeAPI. Ingen server krävs." />
+
+  <!-- Länka stilmall och applikationslogik (JS hämtas defer för att inte blockera render) -->
   <link rel="stylesheet" href="style.css" />
   <script defer src="app.js"></script>
 </head>
 <body>
+<!-- Webbplatsens topp: varumärke + sök- och sorteringskontroller -->
 <header class="site-header">
   <div class="wrap header-inner">
+    <!-- Logotyp/ikon + rubriker -->
     <div class="brand" aria-label="Appnamn">
+      <!-- Enkel SVG-ikon; 'aria-hidden' eftersom den bara är dekorativ -->
       <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm0 3a7 7 0 0 1 6.708 5H14.5a2.5 2.5 0 0 0-5 0H5.292A7 7 0 0 1 12 5Zm0 14a7 7 0 0 1-6.708-5H9.5a2.5 2.5 0 0 0 5 0h4.208A7 7 0 0 1 12 19Z"/></svg>
       <div>
         <h1>Pokedex</h1>
@@ -19,7 +27,9 @@
       </div>
     </div>
 
+    <!-- Sök, sortera, och rensa. 'role="search"' förbättrar a11y. -->
     <form id="controls" class="controls" autocomplete="off" role="search">
+      <!-- Dolda labels för skärmläsare -->
       <label class="visually-hidden" for="q">Sök Pokémon på namn</label>
       <input id="q" name="q" type="search" placeholder="Sök på namn…" />
       <label class="visually-hidden" for="sort">Sortera</label>
@@ -33,19 +43,28 @@
   </div>
 </header>
 
+<!-- Huvudlayouten: vänster "type rail" + höger innehåll -->
 <div class="layout wrap">
+  <!-- Sidomeny för typer; "Alla" är förvalt. Knappar fylls på via JS. -->
   <aside class="type-rail" aria-label="Filtrera på typ">
     <div class="rail-head">
       <h2>Typer</h2>
       <button class="pill active" data-type="">Alla</button>
     </div>
+    <!-- Navigationslista som JS befolkar med typknappar -->
     <nav id="typeList" class="rail-list" role="list"></nav>
   </aside>
 
+  <!-- Huvudinnehåll: statusmeddelanden, resultatgrid och paginering -->
   <main class="content" id="content">
+    <!-- Live-region för status ("Laddar…", fel etc.) -->
     <div id="status" class="status" role="status" aria-live="polite"></div>
+
     <section aria-label="Resultat">
+      <!-- Kort (cards) för Pokémon monteras här från JS -->
       <div id="results" class="grid" role="list"></div>
+
+      <!-- Paginering: föregående/nästa + sidindikator; styrs via JS -->
       <div class="pagination" id="pager">
         <button class="btn" id="prev">⟨ Föregående</button>
         <span class="page-info" id="pageInfo">Sida 1</span>
@@ -55,25 +74,30 @@
   </main>
 </div>
 
-<!-- Detaljpanel: fungerar som slide-over på mobil och panel till höger på desktop -->
+<!-- Detaljpanel: visas som slide-over på mobil och som panel till höger på desktop -->
 <aside id="drawer" class="drawer" aria-label="Detaljer" aria-hidden="true">
+  <!-- Stängknapp; JS sätter fokus hit vid öppning (a11y) -->
   <button class="drawer-close" aria-label="Stäng">×</button>
   <div class="drawer-body">
+    <!-- Hero-yta med bild och stor vattenstämplad ID -->
     <div class="hero">
       <img id="dImg" alt="" />
       <div class="id-water" id="dId">#000</div>
     </div>
+    <!-- Namn, typer och key/value-radpar fylls från JS -->
     <h2 id="dName"></h2>
     <div class="badges" id="dTypes"></div>
     <div class="kv" id="dKv"></div>
   </div>
 </aside>
 
+<!-- Sidfot med källa och en "tema-signatur" som används för unik färgsättning -->
 <footer class="site-footer wrap">
   <span>Data: <a href="https://pokeapi.co/" target="_blank" rel="noopener">PokeAPI</a></span>
   <span class="sig">Tema-signatur: <code id="sig"></code></span>
 </footer>
 
+<!-- Fallback om JS är avstängt -->
 <noscript>Den här appen kräver JavaScript för att hämta data från PokeAPI.</noscript>
 </body>
 </html>

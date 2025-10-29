@@ -1,18 +1,22 @@
+/* ========= Design tokens / CSS-variabler ========= */
 :root {
-  --bg: #0b0d12;
-  --panel: #12151c;
-  --card: #161a22;
-  --text: #e9e9ee;
-  --muted: #a7a9b3;
-  --accent: 270 90% 60%; /* h s l (sätts dynamiskt i JS) */
+  --bg: #0b0d12;        /* sidans bakgrund */
+  --panel: #12151c;     /* panelbakgrund (rail/drawer) */
+  --card: #161a22;      /* kortens bakgrund */
+  --text: #e9e9ee;      /* primär textfärg */
+  --muted: #a7a9b3;     /* sekundär textfärg */
+  --accent: 270 90% 60%; /* accent-nyans (sätts dynamiskt via JS) */
   --accent-2: 200 90% 54%;
-  --radius: 16px;
-  --ring: 0 0% 100% / .08;
+  --radius: 16px;       /* rundning på komponenter */
+  --ring: 0 0% 100% / .08; /* subtil kant/outline */
 }
+
+/* Grundinställningar och typsnitt */
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0;
+  /* Bakgrund med två stora radial-gradients för subtil "glow" + solid basfärg */
   background:
     radial-gradient(1200px 600px at 15% -10%, hsl(var(--accent) / .20), transparent),
     radial-gradient(1000px 500px at 115% 10%, hsl(var(--accent-2) / .18), transparent),
@@ -23,13 +27,18 @@ body {
 a { color: hsl(var(--accent-2)); }
 .wrap { max-width: 1200px; margin: 0 auto; padding: 1rem; }
 
-/* Header */
-.site-header { position: sticky; top: 0; z-index: 20; background: color-mix(in oklab, var(--bg) 78%, black 22%); border-bottom: 1px solid #20242e; backdrop-filter: blur(8px); }
+/* ========= Header ========= */
+.site-header {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in oklab, var(--bg) 78%, black 22%); /* halvtransparent + blur */
+  border-bottom: 1px solid #20242e; backdrop-filter: blur(8px);
+}
 .header-inner { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: center; }
 .brand { display: flex; align-items: center; gap: .75rem; }
 .brand h1 { margin: 0; font-size: 1.35rem; }
 .brand small { color: var(--muted); }
 
+/* Sök- och sorteringsfält + knappar */
 .controls { display: grid; grid-template-columns: 1fr auto auto auto; gap: .5rem; }
 .controls input[type="search"], .controls select {
   padding: .65rem .8rem; border-radius: 12px; border: 1px solid #282c38; background: #141821; color: var(--text);
@@ -38,26 +47,31 @@ a { color: hsl(var(--accent-2)); }
 .btn.ghost { background: transparent; border: 1px solid #2a2f3a; color: var(--text); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* Layout */
+/* ========= Layout (två kolumner: rail + content) ========= */
 .layout { display: grid; grid-template-columns: 220px 1fr; gap: 1rem; }
 
-/* Type rail */
-.type-rail { background: var(--panel); border: 1px solid #202634; border-radius: var(--radius); padding: .75rem; position: sticky; top: 78px; height: calc(100dvh - 100px); overflow: auto; }
+/* ========= Type rail (vänsterspalt) ========= */
+.type-rail {
+  background: var(--panel); border: 1px solid #202634; border-radius: var(--radius); padding: .75rem;
+  position: sticky; top: 78px; height: calc(100dvh - 100px); overflow: auto;
+}
 .rail-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
 .rail-head h2 { margin: 0; font-size: 1rem; color: var(--muted); }
 .pill { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .6rem; border-radius: 999px; border: 1px solid #2a3040; background: #121722; color: var(--text); cursor: pointer; }
 .pill.active { outline: 2px solid color-mix(in oklab, hsl(var(--accent)) 60%, white 0%); background: color-mix(in oklab, hsl(var(--accent)) 25%, #121722 75%); }
 .rail-list { display: grid; gap: .4rem; }
 
-/* Content */
+/* ========= Content / status / grid ========= */
 .status { margin: .5rem 0 1rem; display: none; padding: .75rem .9rem; border-radius: 12px; background: #141821; color: var(--muted); border: 1px solid #23293a; }
 .status.show { display: block; }
 .status.err { color: #ffd7d7; background: #2a1518; border-color: #4b1a1f; }
 
+/* Responsivt grid för kort (1/2/3 kolumner beroende på bredd) */
 .grid { display: grid; gap: .9rem; grid-template-columns: repeat(1, minmax(0,1fr)); }
 @media (min-width: 680px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 @media (min-width: 1024px) { .grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 
+/* ========= Card (resultatkort) ========= */
 .card { position: relative; background: var(--card); border: 1px solid #242a38; border-radius: 18px; overflow: hidden; cursor: pointer; }
 .card .inner { display: grid; grid-template-columns: 120px 1fr; gap: .75rem; padding: .9rem; align-items: center; }
 .thumb { width: 120px; height: 120px; display: grid; place-items: center; background: #0f131b; border-radius: 14px; }
@@ -69,12 +83,15 @@ a { color: hsl(var(--accent-2)); }
 .badges { display: flex; flex-wrap: wrap; gap: .35rem; }
 .badge { font-size: .75rem; padding: .18rem .5rem; border-radius: 999px; background: #222836; color: #dde3f0; border: 1px solid #2d3546; }
 
+/* Stor vattensignatur (ID) nere i kortet */
 .watermark { position: absolute; right: .5rem; bottom: .3rem; font-weight: 700; font-size: 3rem; line-height: 1; color: #ffffff10; pointer-events: none; }
 
+/* Pagineringens layout */
 .pagination { margin: 1rem 0 2rem; display: flex; gap: .5rem; align-items: center; justify-content: center; }
 .page-info { color: var(--muted); font-size: .9rem; }
 
-/* Drawer = slide-over (mobil) / panel (desktop) */
+/* ========= Drawer: detaljpanel ========= */
+/* På mobiler blir detta en slide-over från höger; på desktop ligger den snyggt till höger */
 .drawer {
   position: fixed;
   top: 78px;
@@ -85,11 +102,11 @@ a { color: hsl(var(--accent-2)); }
   border: 1px solid #202634;
   border-radius: 16px 0 0 16px;
   overflow: hidden;
-  transform: translateX(100%);
+  transform: translateX(100%);          /* gömd initialt */
   transition: transform .25s ease;
   z-index: 30;
 }
-.drawer[aria-hidden="false"] { transform: translateX(0); }
+.drawer[aria-hidden="false"] { transform: translateX(0); } /* visas när JS sätter aria-hidden="false" */
 .drawer-close { position: absolute; top: .5rem; right: .5rem; background: transparent; border: 1px solid #2a3040; color: #9aa0aa; border-radius: 10px; padding: .2rem .45rem; cursor: pointer; }
 .drawer-body { padding: 1rem; height: 100%; overflow: auto; }
 .hero { position: relative; background: #0f131b; border: 1px solid #1f2532; border-radius: 14px; display: grid; place-items: center; height: 220px; margin-bottom: .75rem; }
@@ -98,12 +115,13 @@ a { color: hsl(var(--accent-2)); }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: .25rem .75rem; margin-top: .75rem; }
 
 @media (min-width: 980px) {
-  /* håll layouten två-kolumnig, men låt panelen lägga sig snyggt till höger */
+  /* På desktop får panelen fast bredd; layouten i övrigt anpassar sig runt den */
   .drawer { width: 380px; }
 }
 
-/* Footer */
+/* ========= Footer ========= */
 .site-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; color: var(--muted); border-top: 1px solid #20242e; padding: 1rem; font-size: .9rem; }
 
-/* A11y helpers */
+/* ========= A11y-hjälpare ========= */
+/* Skärmläsarvänlig "visually hidden" som ändå är fokuserbar */
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }

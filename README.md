@@ -1,6 +1,6 @@
 # End-Project Pokedex
 
-En single-page webbapp som hämtar data från **PokeAPI** och låter dig:
+En single sida webbapp som hämtar data från **PokeAPI** och låter dig:
 - Söka Pokémon med namn
 - Filtrera via typ
 - Sortera (ID eller namn)
